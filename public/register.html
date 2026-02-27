@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Регистрация</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 400px; margin: 50px auto; padding: 20px; }
+        form { display: flex; flex-direction: column; gap: 15px; }
+        input { padding: 10px; font-size: 16px; }
+        button { padding: 10px; font-size: 16px; cursor: pointer; }
+        .error { color: red; }
+        .success { color: green; }
+        a { color: #0066cc; }
+    </style>
+</head>
+<body>
+    <h1>Регистрация</h1>
+    <form id="registerForm">
+        <input type="text" id="username" name="username" placeholder="Имя пользователя" required>
+        <input type="email" id="email" name="email" placeholder="Email" required>
+        <input type="password" id="password" name="password" placeholder="Пароль" required>
+        <button type="submit">Зарегистрироваться</button>
+    </form>
+    <div id="message"></div>
+    <p>Уже есть аккаунт? <a href="/login.html">Войти</a></p>
+
+    <script>
+        document.getElementById('registerForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const messageDiv = document.getElementById('message');
+            
+            const data = {
+                username: document.getElementById('username').value,
+                email: document.getElementById('email').value,
+                password: document.getElementById('password').value
+            };
+
+            try {
+                const response = await fetch('/api/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (response.ok && result.success) {
+                    messageDiv.className = 'success';
+                    messageDiv.textContent = 'Регистрация успешна! Перенаправление...';
+                    setTimeout(() => {
+                        window.location.href = '/dashboard.html';
+                    }, 1000);
+                } else {
+                    messageDiv.className = 'error';
+                    messageDiv.textContent = result.error || 'Ошибка регистрации';
+                }
+            } catch (err) {
+                messageDiv.className = 'error';
+                messageDiv.textContent = 'Ошибка соединения с сервером';
+            }
+        });
+    </script>
+</body>
+</html>

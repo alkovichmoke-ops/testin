@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Личный кабинет</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; }
+        .user-info { background: #f5f5f5; padding: 20px; border-radius: 5px; margin-bottom: 20px; }
+        button { padding: 10px 20px; font-size: 16px; cursor: pointer; }
+        .error { color: red; }
+        h2 { margin-top: 0; }
+    </style>
+</head>
+<body>
+    <h1>Личный кабинет</h1>
+    <div id="userInfo" class="user-info">
+        Загрузка данных...
+    </div>
+    <button id="logoutBtn">Выйти</button>
+    <div id="message"></div>
+
+    <script>
+        // Проверка авторизации и загрузка данных пользователя
+        async function loadUserInfo() {
+            const userInfoDiv = document.getElementById('userInfo');
+            
+            try {
+                const response = await fetch('/api/me');
+                
+                if (response.status === 401 || response.status === 403) {
+                    window.location.href = '/login.html';
+                    return;
+                }
+                
+                const result = await response.json();
+                
+                if (response.ok && result.user) {
+                    const user = result.user;
+                    userInfoDiv.innerHTML = `
+                        <h2>Данные пользователя</h2>
+                        <p><strong>ID:</strong> ${user.id}</p>
+                        <p><strong>Имя:</strong> ${user.username}</p>
+                        <p><strong>Email:</strong> ${user.email}</p>
+                        <p><strong>Дата регистрации:</strong> ${new Date(user.created_at).toLocaleString('ru-RU')}</p>
+                    `;
+                } else {
+                    userInfoDiv.textContent = result.error || 'Ошибка загрузки данных';
+                    userInfoDiv.className = 'error';
+                }
+            } catch (err) {
+                userInfoDiv.textContent = 'Ошибка соединения с сервером';
+                userInfoDiv.className = 'error';
+            }
+        }
+
+        // Выход
+        document.getElementById('logoutBtn').addEventListener('click', async () => {
+            const messageDiv = document.getElementById('message');
+            
+            try {
+                const response = await fetch('/api/logout', { method: 'POST' });
+                const result = await response.json();
+                
+                if (response.ok && result.success) {
+                    window.location.href = '/login.html';
+                } else {
+                    messageDiv.className = 'error';
+                    messageDiv.textContent = result.error || 'Ошибка при выходе';
+                }
+            } catch (err) {
+                messageDiv.className = 'error';
+                messageDiv.textContent = 'Ошибка соединения с сервером';
+            }
+        });
+
+        // Загрузка данных при открытии страницы
+        loadUserInfo();
+    </script>
+</body>
+</html>

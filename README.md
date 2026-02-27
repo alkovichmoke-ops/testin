@@ -17,94 +17,122 @@
 
 ---
 
-## Развёртывание
+## Быстрый старт на Ubuntu 24.04 Server
 
-### Шаг 1: Установка зависимостей
-
-#### Установка Node.js (если не установлен)
+### 1. Обновление системы и установка зависимостей
 
 ```bash
-# Ubuntu/Debian - установка Node.js 22.x (LTS)
-curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
-sudo apt-get install -y nodejs
+sudo apt update && sudo apt upgrade -y
+sudo apt install -y curl git build-essential
+```
 
-# Проверка версии
-node --version
+### 2. Установка Node.js 22.x
+
+```bash
+# Добавление репозитория NodeSource
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+sudo apt install -y nodejs
+
+# Проверка
+node --version  # должно быть v22.x
 npm --version
 ```
 
-> **Примечание**: На момент написания Node.js 22.x — актуальная LTS-версия.  
-> Проверить доступные версии можно на [nodesource.com](https://github.com/nodesource/distributions) или [nodejs.org](https://nodejs.org/).
-
-#### Установка PostgreSQL
+### 3. Установка PostgreSQL
 
 ```bash
-# Ubuntu/Debian
-sudo apt-get update
-sudo apt-get install -y postgresql postgresql-contrib
-
-# Проверка статуса
-sudo systemctl status postgresql
+sudo apt install -y postgresql postgresql-contrib
+sudo systemctl enable postgresql
+sudo systemctl start postgresql
 ```
 
-#### Установка nginx
+### 4. Клонирование/копирование проекта
 
 ```bash
-sudo apt-get install -y nginx
-sudo systemctl enable nginx
+# Если используете git
+git clone <repository-url> /opt/registration-app
+# Или скопируйте файлы проекта в /opt/registration-app
+
+cd /opt/registration-app
 ```
 
----
-
-### Шаг 2: Настройка базы данных PostgreSQL
+### 5. Настройка базы данных
 
 ```bash
-# Вход в PostgreSQL от имени пользователя postgres
-sudo -u postgres psql
+# Создание БД
+sudo -u postgres psql -c "CREATE DATABASE registration_db;"
+
+# Инициализация схемы
+sudo -u postgres psql -d registration_db -f sql/init.sql
 ```
 
-```sql
--- Создание базы данных
-CREATE DATABASE registration_db;
-
--- Создание пользователя (опционально, если не хотите использовать postgres)
-CREATE USER app_user WITH PASSWORD 'your_secure_password';
-GRANT ALL PRIVILEGES ON DATABASE registration_db TO app_user;
-
--- Выход из psql
-\q
-```
-
-Инициализация схемы БД:
+### 6. Установка зависимостей npm
 
 ```bash
-# Подключение к БД и выполнение скрипта
-sudo -u postgres psql -d registration_db -f /path/to/project/sql/init.sql
+npm install --omit=dev
 ```
 
----
+> Если зависает — проверьте DNS и доступ к registry.npmjs.org:
+> ```bash
+> ping registry.npmjs.org
+> # Или используйте зеркало:
+> npm config set registry https://registry.npmmirror.com
+> npm install --omit=dev
+> ```
 
-### Шаг 3: Установка зависимостей проекта
-
-```bash
-cd /home/mok/Documents/testin
-
-# Установка npm-пакетов
-npm install --production
-```
-
----
-
-### Шаг 4: Настройка переменных окружения
-
-Создайте файл `.env` в корне проекта:
+### 7. Настройка .env
 
 ```bash
 cp .env.example .env
 nano .env
 ```
 
-Пример содержимого `.env`:
+### 8. Запуск
+
+```bash
+# Тестовый запуск
+npm start
+
+# Или через systemd (см. ниже)
+```
+
+---
+
+## Полная инструкция по развёртыванию
+
+### Настройка базы данных PostgreSQL
+
+```bash
+# Вход в PostgreSQL
+sudo -u postgres psql
+```
+
+```sql
+-- Создание БД
+CREATE DATABASE registration_db;
+
+-- Опционально: создание отдельного пользователя
+CREATE USER app_user WITH PASSWORD 'your_secure_password';
+GRANT ALL PRIVILEGES ON DATABASE registration_db TO app_user;
+\q
+```
+
+Инициализация схемы:
+
+```bash
+sudo -u postgres psql -d registration_db -f sql/init.sql
+```
+
+---
+
+### Настройка переменных окружения
+
+```bash
+cp .env.example .env
+nano .env
+```
+
+Пример `.env`:
 
 ```env
 PORT=3000
@@ -120,15 +148,15 @@ SESSION_SECRET=your-very-secret-key-change-this-in-production
 
 ---
 
-### Шаг 5: Настройка systemd для автозапуска
+### Настройка systemd для автозапуска
 
-Создайте файл службы systemd:
+Создайте файл службы:
 
 ```bash
 sudo nano /etc/systemd/system/registration-app.service
 ```
 
-Содержимое:
+Содержимое (для Ubuntu 24.04):
 
 ```ini
 [Unit]
@@ -137,23 +165,30 @@ After=network.target postgresql.service
 
 [Service]
 Type=simple
-User=mok
-WorkingDirectory=/home/mok/Documents/testin
-ExecStart=/usr/bin/node /home/mok/Documents/testin/server.js
+# Создайте пользователя для приложения или используйте существующего
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/registration-app
+ExecStart=/usr/bin/node /opt/registration-app/server.js
 Restart=on-failure
 RestartSec=10
 Environment=NODE_ENV=production
+Environment=PATH=/usr/bin:/usr/local/bin
 
 # Логирование
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=registration-app
 
+# Безопасность
+NoNewPrivileges=true
+PrivateTmp=true
+
 [Install]
 WantedBy=multi-user.target
 ```
 
-Активация и запуск:
+Активация:
 
 ```bash
 # Перезагрузка systemd
@@ -162,7 +197,7 @@ sudo systemctl daemon-reload
 # Включение автозапуска
 sudo systemctl enable registration-app
 
-# Запуск службы
+# Запуск
 sudo systemctl start registration-app
 
 # Проверка статуса
@@ -174,15 +209,22 @@ sudo journalctl -u registration-app -f
 
 ---
 
-### Шаг 6: Настройка nginx (reverse proxy)
+### Настройка nginx (reverse proxy)
 
-Создайте конфигурационный файл nginx:
+Установка nginx:
+
+```bash
+sudo apt install -y nginx
+sudo systemctl enable nginx
+```
+
+Создайте конфигурационный файл:
 
 ```bash
 sudo nano /etc/nginx/sites-available/registration-app
 ```
 
-Содержимое:
+Содержимое (для Ubuntu 24.04):
 
 ```nginx
 server {
@@ -206,38 +248,50 @@ server {
         proxy_cache_bypass $http_upgrade;
     }
 
-    # Статические файлы (опционально, nginx может отдавать их напрямую)
+    # Статические файлы
     location /static/ {
-        alias /home/mok/Documents/testin/public/;
+        alias /opt/registration-app/public/;
         expires 30d;
         add_header Cache-Control "public, immutable";
     }
 }
 ```
 
-Активация конфигурации:
+Активация:
 
 ```bash
 # Создание симлинка
 sudo ln -s /etc/nginx/sites-available/registration-app /etc/nginx/sites-enabled/
 
-# Удаление дефолтной конфигурации (если конфликтует)
-sudo rm /etc/nginx/sites-enabled/default
+# Удаление дефолтной конфигурации (если есть)
+sudo rm -f /etc/nginx/sites-enabled/default
 
-# Проверка конфигурации nginx
+# Проверка конфигурации
 sudo nginx -t
 
 # Перезагрузка nginx
 sudo systemctl reload nginx
 ```
 
+> **Примечание для Ubuntu 24.04**: В новых версиях nginx может использовать `/etc/nginx/conf.d/` вместо `sites-available/sites-enabled`.  
+> Альтернативный вариант:
+> ```bash
+> sudo cp /etc/nginx/sites-available/registration-app /etc/nginx/conf.d/registration-app.conf
+> ```
+
 ---
 
-### Шаг 7: Настройка брандмауэра (опционально)
+### Настройка брандмауэра (UFW)
 
 ```bash
-# Разрешить HTTP (порт 80)
+# Разрешить HTTP и HTTPS
 sudo ufw allow 'Nginx Full'
+
+# Разрешить SSH (если нужно)
+sudo ufw allow 'OpenSSH'
+
+# Включить брандмауэр
+sudo ufw enable
 
 # Проверка статуса
 sudo ufw status
@@ -270,20 +324,36 @@ sudo ufw status
 
 1. **HTTPS**: Настройте SSL-сертификат через Let's Encrypt:
    ```bash
-   sudo apt-get install certbot python3-certbot-nginx
+   # Установка Certbot
+   sudo apt install -y certbot python3-certbot-nginx
+   
+   # Получение сертификата
    sudo certbot --nginx -d your-domain.com
+   
+   # Автообновление (добавлено в cron автоматически)
+   sudo certbot renew --dry-run
    ```
 
-2. **Пароль сессии**: Используйте случайную строку для `SESSION_SECRET`:
+2. **Пароль сессии**: Сгенерируйте случайную строку:
    ```bash
    node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
    ```
 
-3. **Ограничение прав БД**: Создайте отдельного пользователя БД с минимальными правами.
+3. **Ограничение прав БД**: Создайте отдельного пользователя с минимальными правами:
+   ```sql
+   CREATE USER app_user WITH PASSWORD 'secure_password';
+   GRANT SELECT, INSERT, UPDATE ON users TO app_user;
+   ```
 
-4. **Брандмауэр**: Закройте порт 3000 для внешнего доступа:
+4. **Брандмауэр**: Закройте порт 3000:
    ```bash
    sudo ufw deny 3000
+   ```
+
+5. **Пользователь для приложения**: Создайте отдельного пользователя:
+   ```bash
+   sudo useradd -r -s /bin/false registration-app
+   sudo chown -R registration-app:registration-app /opt/registration-app
    ```
 
 ---
@@ -291,11 +361,13 @@ sudo ufw status
 ## Структура проекта
 
 ```
-/home/mok/Documents/testin/
+/opt/registration-app/
 ├── server.js              # Основной файл приложения
 ├── package.json           # Зависимости npm
 ├── .env                   # Переменные окружения (не в git!)
 ├── .env.example           # Пример переменных окружения
+├── .gitignore
+├── README.md              # Эта инструкция
 ├── sql/
 │   └── init.sql          # Скрипт инициализации БД
 └── public/
@@ -340,3 +412,62 @@ Content-Type: application/json
   }
 }
 ```
+
+---
+
+## Решение проблем
+
+### npm install зависает
+
+1. Проверьте подключение к интернету:
+   ```bash
+   ping registry.npmjs.org
+   ```
+
+2. Используйте зеркало (если в РФ):
+   ```bash
+   npm config set registry https://registry.npmmirror.com
+   npm install --omit=dev
+   ```
+
+3. Очистите кэш npm:
+   ```bash
+   npm cache clean --force
+   npm install
+   ```
+
+### Ошибка подключения к PostgreSQL
+
+1. Проверьте статус:
+   ```bash
+   sudo systemctl status postgresql
+   ```
+
+2. Проверьте `pg_hba.conf`:
+   ```bash
+   sudo nano /etc/postgresql/*/main/pg_hba.conf
+   # Убедитесь, что есть: local all postgres peer
+   ```
+
+3. Перезапустите PostgreSQL:
+   ```bash
+   sudo systemctl restart postgresql
+   ```
+
+### Приложение не запускается
+
+1. Проверьте логи:
+   ```bash
+   sudo journalctl -u registration-app -n 50
+   ```
+
+2. Проверьте `.env`:
+   ```bash
+   cat /opt/registration-app/.env
+   ```
+
+3. Запустите вручную для отладки:
+   ```bash
+   cd /opt/registration-app
+   node server.js
+   ```

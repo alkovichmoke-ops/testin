@@ -11,7 +11,7 @@
 
 ## Требования
 
-- Node.js >= 16.x
+- Node.js >= 22.x (LTS)
 - PostgreSQL >= 12
 - nginx
 
@@ -24,14 +24,17 @@
 #### Установка Node.js (если не установлен)
 
 ```bash
-# Ubuntu/Debian
-curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+# Ubuntu/Debian - установка Node.js 22.x (LTS)
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
 sudo apt-get install -y nodejs
 
 # Проверка версии
 node --version
 npm --version
 ```
+
+> **Примечание**: На момент написания Node.js 22.x — актуальная LTS-версия.  
+> Проверить доступные версии можно на [nodesource.com](https://github.com/nodesource/distributions) или [nodejs.org](https://nodejs.org/).
 
 #### Установка PostgreSQL
 
